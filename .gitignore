@@ -1,0 +1,6 @@
+# Binaries
+/glimmer
+*.exe
+
+# Go
+vendor/
