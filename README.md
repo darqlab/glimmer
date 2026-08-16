@@ -48,6 +48,16 @@ prints `-llm-help` output and exits (use the window's **Open** button to pick
 a file interactively). The toolbar's sun/moon button overrides the OS
 light/dark preference; the choice is remembered between runs.
 
+### Auto-reload
+
+The open file is watched for changes on disk. Edit it in another program —
+your editor, a script, `git checkout` of a different revision — and the
+window updates automatically, usually within ~200ms, with no click and no
+confirmation banner. Scroll position is preserved across the update. Opening
+a different file re-targets the watch to it; the previous file stops
+triggering updates. If the file is deleted, the last good render stays on
+screen until a file with the same name reappears in that directory.
+
 ## Build from source (development)
 
 Requires Go 1.21+, Node.js/npm, and on Linux the GTK/WebKitGTK dev packages:
@@ -77,6 +87,9 @@ Every push/PR also runs `.github/workflows/ci.yml` (Linux build + `go vet`).
   runs the binary with no arguments, isn't intercepted by the help/exit path)
 - `app.go` — Go backend: renders markdown to HTML (goldmark + GFM extensions),
   exposes `OpenFile` / `GetInitialFile` / `LoadFile` to the frontend
+- `watcher.go` — filesystem watch on the open file's parent directory
+  (fsnotify + debounce); pushes a `file:changed` event to the frontend on
+  external edits
 - `frontend/` — vanilla HTML/CSS/JS UI (toolbar, theme toggle, markdown styles)
 - `install.sh` / `install.ps1` — end-user installers (download latest release)
 - `build.sh` / `scripts/dev-install.sh` — build-from-source for development

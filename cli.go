@@ -85,6 +85,11 @@ BEHAVIOR
     window; code blocks scroll horizontally instead of wrapping.
   - Theme follows the OS light/dark preference by default; use the toolbar's
     sun/moon button to override, which is remembered between runs.
+  - The open file is watched for external changes; editing it in another
+    program (editor, script, etc.) re-renders the window automatically
+    within ~200ms, preserving scroll position. No confirmation, no banner —
+    the content simply updates in place. Opening a different file re-targets
+    the watch to it.
 
 ERRORS
   - Non-.md/.markdown path      -> "<path>: not a .md file"
