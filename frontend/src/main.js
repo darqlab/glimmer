@@ -1,11 +1,13 @@
 import './style.css';
 
 import { OpenFile, GetInitialFile } from '../wailsjs/go/main/App';
+import { EventsOn } from '../wailsjs/runtime/runtime';
 
 const openBtn = document.getElementById('open-btn');
 const themeBtn = document.getElementById('theme-btn');
 const pathLabel = document.getElementById('path-label');
 const content = document.getElementById('content');
+const contentWrap = document.getElementById('content-wrap');
 const emptyState = document.getElementById('empty-state');
 
 const THEME_ICONS = { light: '☀️', dark: '🌙' };
@@ -80,3 +82,19 @@ GetInitialFile()
         }
     })
     .catch(showError);
+
+// Auto-reload: the backend watches the open file and pushes a re-render on
+// external change. Apply silently — no banner, no confirm click (DEC-A1) —
+// and preserve the reader's scroll position across the swap. The offset is
+// restored as an absolute value, not proportionally, because a proportional
+// restore would move the reader's line whenever the document length changes,
+// which is exactly what an edit does.
+EventsOn('file:changed', (result) => {
+    if (!result || !result.html) {
+        return;
+    }
+    const prevScrollTop = contentWrap.scrollTop;
+    showResult(result);
+    const maxScrollTop = Math.max(0, contentWrap.scrollHeight - contentWrap.clientHeight);
+    contentWrap.scrollTop = Math.min(prevScrollTop, maxScrollTop);
+});
