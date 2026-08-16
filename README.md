@@ -5,6 +5,33 @@ Go backend + embedded webview frontend) and renders `.md` files as styled,
 responsive HTML — real tables that reflow with the window, dark/light theme,
 GitHub-Flavored Markdown (tables, task lists, strikethrough).
 
+## Install
+
+**macOS / Linux:**
+
+```bash
+curl -sL https://raw.githubusercontent.com/darqlab/glimmer/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/darqlab/glimmer/main/install.ps1 | iex
+```
+
+Both scripts fetch the latest [release](https://github.com/darqlab/glimmer/releases)
+for your platform and install the `glimmer` command:
+
+- macOS: installs `glimmer.app` to `~/Applications` and links `glimmer` into
+  `~/.local/bin` (override with `APPDIR=...` / `DEST=...`)
+- Linux: installs the `glimmer` binary to `~/.local/bin` (override with `DEST=...`)
+- Windows: installs `glimmer.exe` to `%LOCALAPPDATA%\Programs\glimmer` and adds
+  it to your user `PATH` (override with `-Dest`). A double-click NSIS installer
+  (`glimmer-amd64-installer.exe`) is also attached to each release if preferred.
+
+Install a specific version instead of latest with `GLIMMER_VERSION=v0.2.0`
+(Unix) or `-Version v0.2.0` (Windows).
+
 ## Usage
 
 ```
@@ -21,22 +48,27 @@ prints `-llm-help` output and exits (use the window's **Open** button to pick
 a file interactively). The toolbar's sun/moon button overrides the OS
 light/dark preference; the choice is remembered between runs.
 
-## Build
+## Build from source (development)
 
 Requires Go 1.21+, Node.js/npm, and on Linux the GTK/WebKitGTK dev packages:
 
 ```bash
 sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev   # Linux only, one-time
-./build.sh     # builds ./build/bin/glimmer
-./install.sh   # builds and installs to ~/.local/bin/glimmer (DEST=... to override)
+./build.sh               # builds ./build/bin/glimmer
+./scripts/dev-install.sh # builds and installs to ~/.local/bin/glimmer (DEST=... to override)
 ```
-
-## Development
 
 ```bash
 wails dev      # live-reloading dev server
 wails doctor   # check build dependencies
 ```
+
+## Releases
+
+Pushing a tag matching `v*.*.*` triggers `.github/workflows/release.yml`,
+which builds Linux (amd64), Windows (amd64, plus an NSIS installer) and macOS
+(universal) binaries in parallel and publishes them to a GitHub Release.
+Every push/PR also runs `.github/workflows/ci.yml` (Linux build + `go vet`).
 
 ## Project layout
 
@@ -46,3 +78,6 @@ wails doctor   # check build dependencies
 - `app.go` — Go backend: renders markdown to HTML (goldmark + GFM extensions),
   exposes `OpenFile` / `GetInitialFile` / `LoadFile` to the frontend
 - `frontend/` — vanilla HTML/CSS/JS UI (toolbar, theme toggle, markdown styles)
+- `install.sh` / `install.ps1` — end-user installers (download latest release)
+- `build.sh` / `scripts/dev-install.sh` — build-from-source for development
+- `.github/workflows/` — CI (build+vet) and release (cross-platform) pipelines
