@@ -1,6 +1,5 @@
-# Binaries
-/glimmer
-*.exe
-
-# Go
-vendor/
+build/bin
+node_modules
+frontend/dist
+frontend/wailsjs
+frontend/package.json.md5

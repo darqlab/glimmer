@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>glimmer</title>
+</head>
+<body>
+<div id="app">
+    <header id="toolbar">
+        <button id="open-btn" class="btn" title="Open a markdown file">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M10 4H2v16h20V6H12l-2-2z"/>
+            </svg>
+            Open
+        </button>
+        <span id="path-label" class="path-label"></span>
+        <button id="theme-btn" class="btn icon-btn" title="Toggle dark / light mode"></button>
+    </header>
+    <main id="content-wrap">
+        <div id="content" class="markdown-body"></div>
+        <div id="empty-state">
+            <p>Open a <code>.md</code> file to start reading.</p>
+        </div>
+    </main>
+</div>
+<script src="./src/main.js" type="module"></script>
+</body>
+</html>
