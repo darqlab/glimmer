@@ -33,8 +33,8 @@ jobs:
       - name: Add Go bin to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Vet
-        run: go vet ./...
-
       - name: Build
         run: wails build -clean
+
+      - name: Vet
+        run: go vet ./...
