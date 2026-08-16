@@ -17,6 +17,7 @@ import (
 type App struct {
 	ctx     context.Context
 	initial string // file path passed on the command line, if any
+	watcher *fileWatcher
 }
 
 // NewApp creates a new App application struct.
@@ -27,6 +28,12 @@ func NewApp(initial string) *App {
 // startup is called at application startup.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.watcher = newFileWatcher(ctx)
+}
+
+// shutdown is called when the application is closing.
+func (a *App) shutdown(ctx context.Context) {
+	a.watcher.close()
 }
 
 // FileResult is returned to the frontend after loading and rendering a
@@ -84,7 +91,11 @@ func (a *App) GetInitialFile() (FileResult, error) {
 	if a.initial == "" {
 		return FileResult{}, nil
 	}
-	return renderFile(a.initial)
+	result, err := renderFile(a.initial)
+	if err == nil {
+		a.watcher.watch(result.Path)
+	}
+	return result, err
 }
 
 // OpenFile shows a native file-open dialog filtered to markdown files, then
@@ -103,10 +114,18 @@ func (a *App) OpenFile() (FileResult, error) {
 	if path == "" {
 		return FileResult{}, nil
 	}
-	return renderFile(path)
+	result, err := renderFile(path)
+	if err == nil {
+		a.watcher.watch(result.Path)
+	}
+	return result, err
 }
 
 // LoadFile reads and renders a specific path, for future drag-and-drop use.
 func (a *App) LoadFile(path string) (FileResult, error) {
-	return renderFile(path)
+	result, err := renderFile(path)
+	if err == nil {
+		a.watcher.watch(result.Path)
+	}
+	return result, err
 }
