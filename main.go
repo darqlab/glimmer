@@ -22,6 +22,11 @@ func main() {
 		Title:  "glimmer",
 		Width:  1024,
 		Height: 768,
+		// Floor only. No MaxWidth/MaxHeight: the ceiling on an interactive
+		// resize comes from the window manager's per-monitor work area, and
+		// setting a max here would only tighten it further.
+		MinWidth:  480,
+		MinHeight: 360,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
