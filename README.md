@@ -63,14 +63,14 @@ screen until a file with the same name reappears in that directory.
 Requires Go 1.21+, Node.js/npm, and on Linux the GTK/WebKitGTK dev packages:
 
 ```bash
-sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev   # Linux only, one-time
+sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev   # Linux only, one-time
 ./build.sh               # builds ./build/bin/glimmer
 ./scripts/dev-install.sh # builds and installs to ~/.local/bin/glimmer (DEST=... to override)
 ```
 
 ```bash
-wails dev      # live-reloading dev server
-wails doctor   # check build dependencies
+wails dev -tags webkit2_41   # live-reloading dev server
+wails doctor                 # check build dependencies
 ```
 
 ## Releases

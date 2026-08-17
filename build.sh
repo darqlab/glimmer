@@ -13,6 +13,6 @@ command -v wails >/dev/null 2>&1 || {
 }
 
 echo "==> building glimmer ($(go version))"
-wails build
+wails build -tags webkit2_41
 
 echo "==> built ./build/bin/glimmer"

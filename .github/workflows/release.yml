@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Install NSIS (Windows installer)
         if: runner.os == 'Windows'
@@ -50,8 +50,12 @@ jobs:
         shell: bash
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Build (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: wails build -clean -platform ${{ matrix.platform }} -tags webkit2_41
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
         run: wails build -clean -platform ${{ matrix.platform }}
 
       - name: Build (Windows, with NSIS installer)
