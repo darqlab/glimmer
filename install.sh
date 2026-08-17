@@ -10,7 +10,7 @@
 #   GLIMMER_VERSION  release tag to install (default: latest)
 #   DEST             directory for the `glimmer` command (default: ~/.local/bin)
 #   APPDIR           macOS only: where to place glimmer.app (default: ~/Applications)
-set -euo pipefail
+set -eu
 
 REPO="darqlab/glimmer"
 VERSION="${GLIMMER_VERSION:-latest}"
