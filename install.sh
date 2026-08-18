@@ -69,6 +69,20 @@ esac
 
 mkdir -p "$DEST"
 
+webkit_missing=0
+if [ "$os" = "Linux" ]; then
+    if ! ldconfig -p 2>/dev/null | grep -q 'libwebkit2gtk-4\.1\.so\.0'; then
+        echo "==> libwebkit2gtk-4.1 not found (glimmer's runtime dependency)"
+        if command -v apt-get >/dev/null 2>&1; then
+            echo "==> installing libwebkit2gtk-4.1-0 via apt (may prompt for sudo password)"
+            sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-0 || true
+        fi
+        if ! ldconfig -p 2>/dev/null | grep -q 'libwebkit2gtk-4\.1\.so\.0'; then
+            webkit_missing=1
+        fi
+    fi
+fi
+
 if [ "$os" = "Darwin" ]; then
     app_dest="${APPDIR:-$HOME/Applications}"
     mkdir -p "$app_dest"
@@ -87,3 +101,10 @@ case ":$PATH:" in
     *":$DEST:"*) ;;
     *) echo "==> note: $DEST is not on your PATH — add it to use the 'glimmer' command directly" ;;
 esac
+
+if [ "$webkit_missing" -eq 1 ]; then
+    echo "glimmer: WARNING — libwebkit2gtk-4.1 is still missing. glimmer is installed but will fail to launch with:" >&2
+    echo "  error while loading shared libraries: libwebkit2gtk-4.1.so.0: cannot open shared object file: No such file or directory" >&2
+    echo "  Install it manually, e.g.: sudo apt-get install -y libwebkit2gtk-4.1-0" >&2
+    exit 1
+fi
