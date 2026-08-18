@@ -3,7 +3,7 @@
 # macOS or Linux.
 #
 # Usage:
-#   curl -sL https://raw.githubusercontent.com/darqlab/glimmer/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/darqlab/glimmer/main/install.sh | sh
 #   GLIMMER_VERSION=v0.2.0 DEST=/usr/local/bin ./install.sh
 #
 # Env vars:
