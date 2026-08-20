@@ -15,6 +15,8 @@
             Open
         </button>
         <span id="path-label" class="path-label"></span>
+        <button id="lines-btn" class="btn icon-btn icon-group-start" title="Toggle source line numbers">#️⃣</button>
+        <button id="copy-btn" class="btn icon-btn" title="Copy selected text automatically">📋</button>
         <button id="theme-btn" class="btn icon-btn" title="Toggle dark / light mode"></button>
     </header>
     <main id="content-wrap">
@@ -23,6 +25,7 @@
             <p>Open a <code>.md</code> file to start reading.</p>
         </div>
     </main>
+    <div id="toast" role="status" aria-live="polite"></div>
 </div>
 <script src="./src/main.js" type="module"></script>
 </body>

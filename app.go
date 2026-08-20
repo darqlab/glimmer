@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 )
 
 // App holds the running Wails application state.
@@ -69,8 +72,15 @@ func renderFile(path string) (FileResult, error) {
 	}
 
 	var buf strings.Builder
-	if err := markdown.Convert(src, &buf); err != nil {
-		return FileResult{}, err
+	doc := markdown.Parser().Parse(text.NewReader(src))
+	lineStarts := buildLineIndex(src)
+	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
+		ln := lineOf(lineStarts, firstOffset(n))
+		fmt.Fprintf(&buf, `<div class="md-block" data-line="%d">`, ln)
+		if err := markdown.Renderer().Render(&buf, src, n); err != nil {
+			return FileResult{}, err
+		}
+		buf.WriteString("</div>")
 	}
 
 	abs, err := filepath.Abs(path)
@@ -83,6 +93,50 @@ func renderFile(path string) (FileResult, error) {
 		Name: filepath.Base(abs),
 		HTML: buf.String(),
 	}, nil
+}
+
+// buildLineIndex returns the byte offset of the start of each line in src.
+// Index 0 holds the offset of line 1, index 1 the offset of line 2, etc.
+func buildLineIndex(src []byte) []int {
+	starts := []int{0}
+	for i, b := range src {
+		if b == '\n' {
+			starts = append(starts, i+1)
+		}
+	}
+	return starts
+}
+
+// lineOf returns the 1-based source line containing byte offset off, given
+// the line-start index built by buildLineIndex.
+func lineOf(starts []int, off int) int {
+	if off < 0 {
+		return 1
+	}
+	// sort.SearchInts finds the first index i such that starts[i] > off,
+	// which is the count of line starts at or before off — i.e. the
+	// 1-based line number itself.
+	return sort.SearchInts(starts, off+1)
+}
+
+// firstOffset returns the byte offset of the first source rune covered by
+// node n. Leaf-ish blocks (paragraphs, headings, fenced code) carry their
+// own Lines(); container blocks (List, Blockquote, Table) do not and must
+// be resolved by recursing into their first child. Returns -1 if no offset
+// can be found anywhere in the subtree.
+func firstOffset(n ast.Node) int {
+	if n == nil {
+		return -1
+	}
+	if lines := n.Lines(); lines != nil && lines.Len() > 0 {
+		return lines.At(0).Start
+	}
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if off := firstOffset(c); off >= 0 {
+			return off
+		}
+	}
+	return -1
 }
 
 // GetInitialFile returns the rendered file passed on the command line, if

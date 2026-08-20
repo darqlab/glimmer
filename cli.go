@@ -85,6 +85,14 @@ BEHAVIOR
     window; code blocks scroll horizontally instead of wrapping.
   - Theme follows the OS light/dark preference by default; use the toolbar's
     sun/moon button to override, which is remembered between runs.
+  - Source line numbers: the toolbar's #️⃣ button toggles a left-hand gutter
+    showing the source .md file's line number for each top-level block
+    (heading, paragraph, code fence, table, etc). Numbers mark block starts,
+    not every wrapped visual line. Off by default; remembered between runs.
+  - Copy on selection: the toolbar's 📋 button toggles automatic clipboard
+    copy of any text selected in the reading area (mouse only; a brief
+    toast confirms). On by default, since the window is read-only and
+    selecting text has no other purpose; remembered between runs.
   - The open file is watched for external changes; editing it in another
     program (editor, script, etc.) re-renders the window automatically
     within ~200ms, preserving scroll position. No confirmation, no banner —
