@@ -1,14 +1,17 @@
 import './style.css';
 
 import { OpenFile, GetInitialFile } from '../wailsjs/go/main/App';
-import { EventsOn } from '../wailsjs/runtime/runtime';
+import { EventsOn, ClipboardSetText } from '../wailsjs/runtime/runtime';
 
 const openBtn = document.getElementById('open-btn');
 const themeBtn = document.getElementById('theme-btn');
+const linesBtn = document.getElementById('lines-btn');
+const copyBtn = document.getElementById('copy-btn');
 const pathLabel = document.getElementById('path-label');
 const content = document.getElementById('content');
 const contentWrap = document.getElementById('content-wrap');
 const emptyState = document.getElementById('empty-state');
+const toast = document.getElementById('toast');
 
 const THEME_ICONS = { light: '☀️', dark: '🌙' };
 
@@ -40,6 +43,97 @@ themeBtn.addEventListener('click', () => {
 });
 
 initTheme();
+
+// Source line numbers: purely a data attribute on the content container —
+// the gutter itself is drawn by CSS from each block's data-line. Off by
+// default (it changes the page's look); persisted like the theme toggle.
+function applyLines(on) {
+    content.dataset.lines = on ? 'on' : '';
+    linesBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
+function initLines() {
+    const saved = localStorage.getItem('glimmer:lines');
+    applyLines(saved === 'on');
+}
+
+linesBtn.addEventListener('click', () => {
+    const next = content.dataset.lines !== 'on';
+    localStorage.setItem('glimmer:lines', next ? 'on' : 'off');
+    applyLines(next);
+});
+
+initLines();
+
+// Copy-on-selection: glimmer is read-only, so selecting text has exactly
+// one purpose — copying it. On by default; the toggle is the escape hatch.
+let autoCopyEnabled = true;
+
+function applyAutoCopy(on) {
+    autoCopyEnabled = on;
+    copyBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    copyBtn.style.opacity = on ? '1' : '0.5';
+}
+
+function initAutoCopy() {
+    const saved = localStorage.getItem('glimmer:autocopy');
+    applyAutoCopy(saved === null ? true : saved === 'on');
+}
+
+copyBtn.addEventListener('click', () => {
+    const next = !autoCopyEnabled;
+    localStorage.setItem('glimmer:autocopy', next ? 'on' : 'off');
+    applyAutoCopy(next);
+});
+
+initAutoCopy();
+
+let toastTimer = null;
+
+function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+    toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+        toastTimer = null;
+    }, 1600);
+}
+
+function copyText(text) {
+    if (typeof ClipboardSetText === 'function') {
+        return ClipboardSetText(text).then(() => undefined);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+    }
+    return Promise.reject(new Error('no clipboard API available'));
+}
+
+document.addEventListener('mouseup', () => {
+    if (!autoCopyEnabled) {
+        return;
+    }
+    // Deferred a tick: on mouseup the selection is not yet finalized.
+    setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection) {
+            return;
+        }
+        const text = selection.toString();
+        if (!text.trim()) {
+            return; // plain click, or whitespace-only selection
+        }
+        if (!contentWrap.contains(selection.anchorNode)) {
+            return; // selection outside the reading area (toolbar, etc.)
+        }
+        copyText(text)
+            .then(() => showToast('Copied to clipboard'))
+            .catch(() => {});
+    }, 0);
+});
 
 function showResult(result) {
     if (!result || !result.html) {

@@ -113,10 +113,15 @@ body {
 }
 
 .icon-btn {
-    margin-left: auto;
     padding: 0.4rem 0.6rem;
     font-size: 1rem;
     line-height: 1;
+}
+
+/* Pushes the whole cluster of trailing icon buttons to the right edge of
+   the toolbar; only the first icon button in the group carries this. */
+.icon-group-start {
+    margin-left: auto;
 }
 
 .path-label {
@@ -163,6 +168,34 @@ body {
 
 .markdown-body:empty {
     display: none;
+}
+
+/* Each top-level block is wrapped in a .md-block div so it can carry a
+   source line number. The wrapper deliberately establishes no BFC (only
+   position: relative, which does not) and has no border or padding, so each
+   child's vertical margin still collapses through it and adjacent blocks
+   collapse against each other exactly as they did before the wrapper existed
+   — do NOT zero the child margins here, that flattens the whole document. */
+
+/* Source line number gutter (toggle: #lines-btn). Numbers mark block
+   starts, not visual lines. */
+.markdown-body[data-lines="on"] {
+    padding-left: 4.5rem;
+}
+
+.md-block {
+    position: relative;
+}
+
+.markdown-body[data-lines="on"] .md-block::before {
+    content: attr(data-line);
+    position: absolute;
+    left: -3.5rem;
+    width: 3rem;
+    text-align: right;
+    font: 0.78em/1.9 var(--mono);
+    color: var(--fg-muted);
+    user-select: none; /* critical: numbers must never land in copied text */
 }
 
 /* Typography */
@@ -301,4 +334,27 @@ body {
     .markdown-body {
         padding: 1rem 1rem 2rem;
     }
+}
+
+/* Copy-on-selection toast */
+#toast {
+    position: fixed;
+    /* Below the toolbar, not over it — the toolbar is ~2.6rem tall. */
+    top: 3.4rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-0.5rem);
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    background: var(--btn-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+
+#toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }

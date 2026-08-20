@@ -48,6 +48,21 @@ prints `-llm-help` output and exits (use the window's **Open** button to pick
 a file interactively). The toolbar's sun/moon button overrides the OS
 light/dark preference; the choice is remembered between runs.
 
+### Source line numbers
+
+The toolbar's `#️⃣` button toggles a left-hand gutter showing the source
+`.md` file's line number for each top-level block (heading, paragraph, code
+fence, table, etc). Numbers mark block starts, not every wrapped visual
+line. Off by default; the choice is remembered between runs.
+
+### Copy on selection
+
+The toolbar's `📋` button toggles automatic clipboard copy of any text you
+select in the reading area with the mouse, with a brief toast confirming the
+copy. Since the window is read-only, selecting text has no other purpose. On
+by default; the choice is remembered between runs. (Keyboard selection still
+works with Ctrl+C as usual — this toggle only affects mouse selection.)
+
 ### Auto-reload
 
 The open file is watched for changes on disk. Edit it in another program —
