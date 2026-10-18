@@ -1,6 +1,6 @@
 import './style.css';
 
-import { OpenFile, GetInitialFile } from '../wailsjs/go/main/App';
+import { OpenFile, GetInitialFile, GetHighlightCSS } from '../wailsjs/go/main/App';
 import { EventsOn, ClipboardSetText } from '../wailsjs/runtime/runtime';
 
 const openBtn = document.getElementById('open-btn');
@@ -8,9 +8,17 @@ const themeBtn = document.getElementById('theme-btn');
 const linesBtn = document.getElementById('lines-btn');
 const copyBtn = document.getElementById('copy-btn');
 const pathLabel = document.getElementById('path-label');
+const pathText = pathLabel.querySelector('bdi');
+const modeLabel = document.getElementById('mode-label');
+const modeLabelText = document.getElementById('mode-label-text');
+const notice = document.getElementById('notice');
+const noticeText = document.getElementById('notice-text');
+const noticeDismiss = document.getElementById('notice-dismiss');
 const content = document.getElementById('content');
 const contentWrap = document.getElementById('content-wrap');
 const emptyState = document.getElementById('empty-state');
+const emptyText = document.getElementById('empty-text');
+const EMPTY_TEXT = emptyText.textContent;
 const toast = document.getElementById('toast');
 
 const THEME_ICONS = { light: '☀️', dark: '🌙' };
@@ -72,7 +80,6 @@ let autoCopyEnabled = true;
 function applyAutoCopy(on) {
     autoCopyEnabled = on;
     copyBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    copyBtn.style.opacity = on ? '1' : '0.5';
 }
 
 function initAutoCopy() {
@@ -135,47 +142,171 @@ document.addEventListener('mouseup', () => {
     }, 0);
 });
 
+// True once a document is on screen. A refusal then goes in the notice bar
+// and leaves the document alone; with no document it fills the content area.
+let hasDocument = false;
+
+function hideNotice() {
+    notice.hidden = true;
+    notice.classList.remove('neutral');
+    notice.setAttribute('role', 'alert');
+}
+
+function showNotice(message) {
+    clearOpening();
+    noticeText.textContent = '';
+    const lead = /^(Can't show [^:]*:)\s*(.*)$/s.exec(message);
+    if (lead) {
+        const strong = document.createElement('strong');
+        strong.textContent = lead[1];
+        noticeText.append(strong, ' ' + lead[2]);
+    } else {
+        noticeText.textContent = message;
+    }
+    notice.classList.remove('neutral');
+    notice.setAttribute('role', 'alert');
+    notice.hidden = false;
+    noticeDismiss.focus();
+}
+
+noticeDismiss.addEventListener('click', () => {
+    hideNotice();
+    openBtn.focus();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !notice.hidden && !notice.classList.contains('neutral')) {
+        hideNotice();
+        openBtn.focus();
+    }
+});
+
+// Slow-load cue (DEC-S10): Go emits file:opening just before it reads the
+// file; if no result has arrived 500 ms later, show a static "Opening <name>…".
+let openingTimer = null;
+let openingShown = false;
+
+function startOpening(name) {
+    clearOpening();
+    openingTimer = setTimeout(() => {
+        openingTimer = null;
+        openingShown = true;
+        const text = `Opening ${name}\u2026`;
+        if (hasDocument) {
+            noticeText.textContent = text;
+            notice.classList.add('neutral');
+            notice.setAttribute('role', 'status');
+            notice.hidden = false;
+        } else {
+            emptyText.textContent = text;
+        }
+    }, 500);
+}
+
+function clearOpening() {
+    if (openingTimer) {
+        clearTimeout(openingTimer);
+        openingTimer = null;
+    }
+    if (openingShown) {
+        openingShown = false;
+        emptyText.textContent = EMPTY_TEXT;
+        if (notice.classList.contains('neutral')) {
+            hideNotice();
+        }
+    }
+}
+
+EventsOn('file:opening', startOpening);
+
+function modeTooltip(result) {
+    if (result.mode === 'source') {
+        return `${result.language} source, shown exactly as on disk`;
+    }
+    if (result.mode === 'text') {
+        return 'Plain text, wrapped';
+    }
+    return 'Rendered markdown';
+}
+
+function applyResult(result) {
+    clearOpening();
+    hideNotice();
+    const mode = result.mode || 'markdown';
+    content.className = result.everyLine ? 'source-body' : 'markdown-body';
+    content.dataset.mode = mode;
+    contentWrap.dataset.mode = mode;
+    content.innerHTML = result.html;
+    emptyState.style.display = 'none';
+    modeLabelText.textContent = result.language || '';
+    modeLabel.title = modeTooltip(result);
+    modeLabel.hidden = false;
+    pathText.textContent = result.path || '';
+    pathLabel.title = result.path || '';
+    document.title = result.name ? `glimmer \u2014 ${result.name}` : 'glimmer';
+    hasDocument = true;
+}
+
 function showResult(result) {
     if (!result || !result.html) {
         return;
     }
-    content.innerHTML = result.html;
-    emptyState.style.display = 'none';
-    pathLabel.textContent = result.path || '';
-    pathLabel.title = result.path || '';
-    document.title = result.name ? `glimmer — ${result.name}` : 'glimmer';
+    if (openingShown) {
+        // Let the cue paint before the (possibly large) insert blocks the thread.
+        requestAnimationFrame(() => requestAnimationFrame(() => applyResult(result)));
+        return;
+    }
+    applyResult(result);
 }
 
 function showError(err) {
     console.error(err);
     const message = (err && err.message) ? err.message : String(err);
-    content.innerHTML = `<p style="color:#c0392b"><strong>Error:</strong> ${escapeHtml(message)}</p>`;
+    if (hasDocument) {
+        showNotice(message);
+        return;
+    }
+    clearOpening();
+    content.className = 'message-body';
+    content.dataset.mode = '';
+    contentWrap.dataset.mode = '';
+    content.textContent = '';
+    const p = document.createElement('p');
+    p.textContent = message;
+    content.appendChild(p);
     emptyState.style.display = 'none';
+    modeLabel.hidden = true;
 }
 
-function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-}
-
-openBtn.addEventListener('click', () => {
-    OpenFile()
+// A load that produced no HTML (cancelled dialog, empty markdown file) must
+// still end the opening cue.
+function settle(promise) {
+    promise
         .then((result) => {
             if (result && result.html) {
                 showResult(result);
+            } else {
+                clearOpening();
             }
         })
         .catch(showError);
+}
+
+openBtn.addEventListener('click', () => {
+    settle(OpenFile());
 });
 
-GetInitialFile()
-    .then((result) => {
-        if (result && result.html) {
-            showResult(result);
-        }
+// The highlight stylesheet must be in the page before the first render, so
+// the initial file is requested only after it has been injected.
+GetHighlightCSS()
+    .then((css) => {
+        const style = document.createElement('style');
+        style.id = 'highlight-css';
+        style.textContent = css;
+        document.head.appendChild(style);
     })
-    .catch(showError);
+    .catch((err) => console.error(err))
+    .then(() => settle(GetInitialFile()));
 
 // Auto-reload: the backend watches the open file and pushes a re-render on
 // external change. Apply silently — no banner, no confirm click (DEC-A1) —
@@ -188,7 +319,10 @@ EventsOn('file:changed', (result) => {
         return;
     }
     const prevScrollTop = contentWrap.scrollTop;
+    const prevScrollLeft = contentWrap.scrollLeft;
     showResult(result);
     const maxScrollTop = Math.max(0, contentWrap.scrollHeight - contentWrap.clientHeight);
+    const maxScrollLeft = Math.max(0, contentWrap.scrollWidth - contentWrap.clientWidth);
     contentWrap.scrollTop = Math.min(prevScrollTop, maxScrollTop);
+    contentWrap.scrollLeft = Math.min(prevScrollLeft, maxScrollLeft);
 });

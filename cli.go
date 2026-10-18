@@ -6,10 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 )
 
-// parseArgs handles -h / -llm-help and returns the markdown file path to open
+// parseArgs handles -h / -llm-help and returns the file path to open
 // on startup, if any. It exits the process directly for help output or
 // argument errors, matching a CLI tool's expected behaviour.
 //
@@ -44,9 +43,8 @@ func parseArgs(args []string) string {
 	}
 
 	path := files[0]
-	lower := strings.ToLower(path)
-	if !strings.HasSuffix(lower, ".md") && !strings.HasSuffix(lower, ".markdown") {
-		fmt.Fprintf(os.Stderr, "glimmer: %s: not a .md file\n", path)
+	if err := preflight(path); err != nil {
+		fmt.Fprintf(os.Stderr, "glimmer: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -54,20 +52,22 @@ func parseArgs(args []string) string {
 }
 
 func usage(fs *flag.FlagSet) {
-	fmt.Fprintf(fs.Output(), "glimmer - a markdown file reader\n\nUsage:\n  glimmer [flags] [file.md]\n\nFlags:\n")
+	fmt.Fprintf(fs.Output(), "glimmer - a viewer for markdown, source code and text files\n\nUsage:\n  glimmer [flags] [file]\n\nFlags:\n")
 	fs.PrintDefaults()
 }
 
 func printLLMHelp() {
-	fmt.Print(`glimmer - markdown file reader (GUI)
+	fmt.Print(`glimmer - viewer for markdown, source code and text files (GUI)
 
 PURPOSE
-  Opens a native window and renders a markdown file as styled, responsive
-  HTML (real tables, wrapped text, dark/light theme). Built with Wails
-  (Go backend + embedded webview frontend).
+  Opens a native window and shows a file read-only. Markdown is rendered as
+  styled, responsive HTML (real tables, wrapped text, dark/light theme).
+  Source and config files are shown with syntax highlighting. Other text
+  files are shown as plain text. Built with Wails (Go backend + embedded
+  webview frontend).
 
 USAGE
-  glimmer [flags] [file.md]
+  glimmer [flags] [file]
   glimmer                     (no args: prints this help, no window)
 
 FLAGS
@@ -75,20 +75,38 @@ FLAGS
   -llm-help   print this machine-readable help
 
 BEHAVIOR
-  - With a file argument: opens a window with that file rendered.
+  - With a file argument: opens a window with that file shown.
   - Without a file argument: prints this help and exits (use the window's
     "Open" button to pick a file interactively instead).
-  - The window has an "Open" button to choose another .md/.markdown file.
-  - Only files ending in ".md" or ".markdown" (case-insensitive) are accepted.
-  - Tables, code blocks, lists, blockquotes and task lists render via GFM
-    (GitHub-Flavored Markdown) rules. Tables reflow responsively with the
-    window; code blocks scroll horizontally instead of wrapping.
+  - The window has an "Open" button to choose another file. The dialog
+    offers "All files" (the default) and "Markdown".
+  - Three modes, chosen per file:
+      markdown  files ending in ".md" or ".markdown" (case-insensitive).
+                Rendered as GitHub-Flavored Markdown: tables, code blocks,
+                lists, blockquotes and task lists. Fenced code blocks that
+                name a language are syntax-highlighted. Code blocks scroll
+                horizontally instead of wrapping.
+      source    files whose name or content chroma recognises: Go, Python,
+                Java, shell, YAML, JSON, XML, TOML, INI, Dockerfile,
+                Makefile, ".env" and many more, including files that start
+                with a shebang line. Highlighted, never wrapped; a
+                horizontal scrollbar appears for long lines.
+      text      ".txt" and ".log" files, and any other text file that is not
+                recognised as source. Shown as plain text, wrapped.
+  - Structured files (JSON, YAML, XML, TOML, INI) are shown exactly as they
+    are on disk: never reformatted, so line numbers match the file. A
+    malformed file still displays; the bad tokens are marked.
+  - Markdown files are limited to 5 MB; source and text files to 256 KB.
+    Binary files (a NUL byte or invalid UTF-8 in the first 8 KB) are
+    refused. Markdown files skip the binary check.
   - Theme follows the OS light/dark preference by default; use the toolbar's
     sun/moon button to override, which is remembered between runs.
-  - Source line numbers: the toolbar's #️⃣ button toggles a left-hand gutter
-    showing the source .md file's line number for each top-level block
-    (heading, paragraph, code fence, table, etc). Numbers mark block starts,
-    not every wrapped visual line. Off by default; remembered between runs.
+  - Source line numbers: the toolbar's #️⃣ button toggles a left-hand gutter.
+    For markdown it shows the source line number of each top-level block
+    (heading, paragraph, code fence, table, etc); numbers mark block
+    starts, not every wrapped visual line. For source and text files every
+    line is numbered, and a wrapped line has one number. Off by default;
+    remembered between runs.
   - Copy on selection: the toolbar's 📋 button toggles automatic clipboard
     copy of any text selected in the reading area (mouse only; a brief
     toast confirms). On by default, since the window is read-only and
@@ -100,9 +118,14 @@ BEHAVIOR
     the watch to it.
 
 ERRORS
-  - Non-.md/.markdown path      -> "<path>: not a .md file"
+  - Binary file                 -> "<path>: binary file, not shown. glimmer shows text files only."
+  - Markdown over 5 MB, or
+    source/text over 256 KB     -> "<path>: file too large (<size> <MB|KB>; limit is <5 MB|256 KB>)"
   - Missing/unreadable file     -> "cannot open <name>: <os error>"
   - Directory path              -> "<path> is a directory, not a file"
+  A binary or oversized file given on the command line exits with status 1
+  before any window opens. A missing file or a directory still opens the
+  window, which shows the error.
 
 EXIT CODES
   0  success (or help printed)
@@ -110,6 +133,8 @@ EXIT CODES
 
 EXAMPLES
   glimmer README.md
+  glimmer main.go
+  glimmer config.yaml
   glimmer -llm-help
 `)
 }

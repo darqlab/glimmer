@@ -22,6 +22,18 @@
     --table-row-alt: rgba(0, 0, 0, 0.02);
     --btn-bg: #ffffff;
     --btn-bg-hover: #eaeaea;
+    --control-border: #8a8a8f;
+    --btn-pressed-bg: #dde8f6;
+    --pressed-bar: #0969da;
+    --focus: #0969da;
+    --label-bg: #e4e4e8;
+    --label-fg: #1a1a1a;
+    --gutter-fg: var(--fg-muted);
+    --gutter-rule: var(--border);
+    --notice-bg: #fcf1dd;
+    --notice-fg: #1a1a1a;
+    --notice-accent: #8a4f00;
+    --notice-rule: #b07a2a;
 }
 
 html[data-theme="dark"] {
@@ -37,6 +49,18 @@ html[data-theme="dark"] {
     --table-row-alt: rgba(255, 255, 255, 0.03);
     --btn-bg: #2a2a30;
     --btn-bg-hover: #35353c;
+    --control-border: #7b7b84;
+    --btn-pressed-bg: #1d3550;
+    --pressed-bar: #6cb6ff;
+    --focus: #6cb6ff;
+    --label-bg: #36363d;
+    --label-fg: #e6e6e6;
+    --gutter-fg: var(--fg-muted);
+    --gutter-rule: var(--border);
+    --notice-bg: #2f2717;
+    --notice-fg: #e6e6e6;
+    --notice-accent: #f0b45c;
+    --notice-rule: #9c7a3a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,6 +77,18 @@ html[data-theme="dark"] {
         --table-row-alt: rgba(255, 255, 255, 0.03);
         --btn-bg: #2a2a30;
         --btn-bg-hover: #35353c;
+        --control-border: #7b7b84;
+        --btn-pressed-bg: #1d3550;
+        --pressed-bar: #6cb6ff;
+        --focus: #6cb6ff;
+        --label-bg: #36363d;
+        --label-fg: #e6e6e6;
+        --gutter-fg: var(--fg-muted);
+        --gutter-rule: var(--border);
+        --notice-bg: #2f2717;
+        --notice-fg: #e6e6e6;
+        --notice-accent: #f0b45c;
+        --notice-rule: #9c7a3a;
     }
 }
 
@@ -100,7 +136,7 @@ body {
     gap: 0.4rem;
     padding: 0.4rem 0.75rem;
     border-radius: 6px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--control-border);
     background: var(--btn-bg);
     color: var(--fg);
     cursor: pointer;
@@ -110,6 +146,16 @@ body {
 
 .btn:hover {
     background: var(--btn-bg-hover);
+}
+
+.btn[aria-pressed="true"] {
+    background: var(--btn-pressed-bg);
+    box-shadow: inset 0 -2px 0 var(--pressed-bar);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
 }
 
 .icon-btn {
@@ -132,6 +178,85 @@ body {
     text-overflow: ellipsis;
     min-width: 0;
     flex: 1 1 auto;
+    /* Truncate from the start so the filename survives; the <bdi dir="ltr">
+       inside keeps the leading "/" from jumping to the end. */
+    direction: rtl;
+    text-align: left;
+}
+
+.mode-label {
+    flex: 0 0 auto;
+    background: var(--label-bg);
+    color: var(--label-fg);
+    border-radius: 4px;
+    padding: 0.32rem 0.5rem;
+    font: 0.78rem/1 var(--mono);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+}
+
+.mode-label[hidden],
+#notice[hidden] {
+    display: none;
+}
+
+/* Visually hidden, still read by screen readers. */
+.vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Notice bar: refusals (amber) and the slow-load cue (neutral). */
+#notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    flex: 0 0 auto;
+    padding: 0.55rem 0.9rem;
+    background: var(--notice-bg);
+    color: var(--notice-fg);
+    border-bottom: 1px solid var(--notice-rule);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.notice-icon {
+    flex: 0 0 auto;
+    color: var(--notice-accent);
+    margin-top: 0.1rem;
+}
+
+.notice-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.notice-dismiss {
+    flex: 0 0 auto;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+    height: 28px;
+}
+
+#notice.neutral {
+    background: var(--bg-toolbar);
+    color: var(--fg-muted);
+    border-bottom-color: var(--border);
+}
+
+#notice.neutral .notice-icon,
+#notice.neutral .notice-dismiss {
+    display: none;
 }
 
 /* Content area */
@@ -143,16 +268,29 @@ body {
     display: flex;
 }
 
+#content-wrap:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+}
+
+#content-wrap[data-mode="source"] {
+    overflow-x: auto;
+}
+
 #empty-state {
     margin: auto;
     color: var(--fg-muted);
     text-align: center;
 }
 
-#empty-state code {
-    background: var(--code-bg);
-    padding: 0.15rem 0.4rem;
-    border-radius: 4px;
+/* A startup/no-document error: plain text in the content area. */
+.message-body {
+    margin: auto;
+    max-width: 36rem;
+    padding: 1.5rem 2rem;
+    color: var(--fg);
+    text-align: center;
+    overflow-wrap: anywhere;
 }
 
 .markdown-body {
@@ -196,6 +334,97 @@ body {
     font: 0.78em/1.9 var(--mono);
     color: var(--fg-muted);
     user-select: none; /* critical: numbers must never land in copied text */
+}
+
+/* Source and text views (non-markdown files). Every source line is one
+   .line; the gutter is a CSS counter on ::before, never DOM text, so it can
+   never be copied (same guarantee as the markdown gutter above). */
+.source-body {
+    width: 100%;
+    min-width: 0;
+    padding: 1rem 1.5rem 3rem;
+    font: 0.875rem/1.6 var(--mono);
+    tab-size: 4;
+}
+
+.source-body:empty {
+    display: none;
+}
+
+#content-wrap[data-mode="source"] .source-body {
+    width: max-content;
+    min-width: 100%;
+}
+
+.src-view .chroma {
+    margin: 0;
+    padding: 0;
+    background: none;
+    counter-reset: ln;
+}
+
+.src-view .chroma code {
+    font: inherit;
+    background: none;
+    padding: 0;
+}
+
+.src-view .chroma .line {
+    display: flex;
+    counter-increment: ln;
+}
+
+.src-view .chroma .cl {
+    white-space: pre;
+}
+
+.src-view[data-mode="text"] .chroma .cl {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#content[data-lines="on"] .src-view .chroma .line::before {
+    content: counter(ln);
+    flex: 0 0 calc(var(--gutter-ch) * 1ch);
+    text-align: right;
+    padding-right: 1ch;
+    margin-right: 1.5ch;
+    border-right: 1px solid var(--gutter-rule);
+    color: var(--gutter-fg);
+    background: var(--bg); /* code scrolls under it */
+    font-variant-numeric: tabular-nums;
+    user-select: none; /* critical: numbers must never land in copied text */
+    position: sticky;
+    left: 0;
+}
+
+/* Malformed tokens: colour is not the only cue. */
+.chroma .err {
+    text-decoration: underline wavy;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+/* Empty source/text file: a note where line 1 would be. Generated content,
+   so it is not selectable, not copied and gets no gutter number. */
+.src-view[data-empty="true"] .chroma {
+    display: none;
+}
+
+.src-view[data-empty="true"]::before {
+    content: "Empty file";
+    display: block;
+    font: 0.85rem var(--font);
+    color: var(--fg-muted);
+    user-select: none;
+}
+
+@media (max-width: 600px) {
+    .source-body {
+        padding: 0.75rem 1rem 2rem;
+    }
 }
 
 /* Typography */
