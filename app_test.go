@@ -1,12 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 )
 
 func TestBuildLineIndex(t *testing.T) {
@@ -100,10 +106,90 @@ func TestRenderFileDataLineMatchesSource(t *testing.T) {
 	// the two node types goldmark's HTML renderer drops attributes for,
 	// which is why the wrapper-div approach is used instead of
 	// SetAttributeString on the AST node).
-	if !strings.Contains(result.HTML, "<pre>") {
+	if !strings.Contains(result.HTML, "<pre") {
 		t.Error("expected a <pre> fenced code block in the output")
 	}
 	if !strings.Contains(result.HTML, "<table>") {
 		t.Error("expected a <table> in the output")
+	}
+}
+
+// writeFixture writes content to name inside a fresh temp dir.
+func writeFixture(t *testing.T, name string, content []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("writing fixture: %v", err)
+	}
+	return path
+}
+
+// AT-S01: markdown without labelled fences renders exactly as the
+// pre-change pipeline did (rebuilt here, no golden string).
+func TestRenderFileMarkdownUnchangedAT_S01(t *testing.T) {
+	src := "# Title\n\nA paragraph with <span>inline html</span>.\n\n" +
+		"- one\n- two\n\n> quote\n\n" +
+		"| A | B |\n|---|---|\n| 1 | 2 |\n\n" +
+		"- [x] done\n- [ ] todo\n\n" +
+		"```\nunlabelled fence\n```\n\n<div>raw</div>\n"
+	path := writeFixture(t, "s01.md", []byte(src))
+
+	old := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithUnsafe()),
+	)
+	var want strings.Builder
+	doc := old.Parser().Parse(text.NewReader([]byte(src)))
+	starts := buildLineIndex([]byte(src))
+	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
+		fmt.Fprintf(&want, `<div class="md-block" data-line="%d">`, lineOf(starts, firstOffset(n)))
+		if err := old.Renderer().Render(&want, []byte(src), n); err != nil {
+			t.Fatal(err)
+		}
+		want.WriteString("</div>")
+	}
+
+	got, err := renderFile(path)
+	if err != nil {
+		t.Fatalf("renderFile: %v", err)
+	}
+	if got.HTML != want.String() {
+		t.Errorf("markdown HTML differs from pre-change pipeline\n got: %s\nwant: %s", got.HTML, want.String())
+	}
+	if got.Mode != "markdown" || got.EveryLine {
+		t.Errorf("Mode=%q EveryLine=%v, want markdown/false", got.Mode, got.EveryLine)
+	}
+}
+
+// AT-S03: a labelled fence is highlighted with chroma classes.
+func TestRenderFileLabelledFenceHighlightedAT_S03(t *testing.T) {
+	path := writeFixture(t, "s03.md", []byte("# T\n\n```go\nfunc main() {\n\tvar x int\n}\n```\n"))
+	got, err := renderFile(path)
+	if err != nil {
+		t.Fatalf("renderFile: %v", err)
+	}
+	if got.Mode != "markdown" {
+		t.Errorf("Mode = %q, want markdown", got.Mode)
+	}
+	if !strings.Contains(got.HTML, `<pre class="chroma">`) {
+		t.Errorf("expected <pre class=\"chroma\">, got:\n%s", got.HTML)
+	}
+	if !strings.Contains(got.HTML, `class="kd"`) && !strings.Contains(got.HTML, `class="nx"`) {
+		t.Errorf("expected a chroma token class (kd/nx), got:\n%s", got.HTML)
+	}
+}
+
+// AT-S04: an unknown fence label is left exactly as before.
+func TestRenderFileUnknownFenceLabelAT_S04(t *testing.T) {
+	path := writeFixture(t, "s04.md", []byte("```nosuchlang\nhello\n```\n"))
+	got, err := renderFile(path)
+	if err != nil {
+		t.Fatalf("renderFile: %v", err)
+	}
+	if !strings.Contains(got.HTML, `<pre><code class="language-nosuchlang">`) {
+		t.Errorf("expected plain language-nosuchlang block, got:\n%s", got.HTML)
+	}
+	if strings.Contains(got.HTML, `class="chroma"`) {
+		t.Errorf("unknown label must not be chroma-highlighted:\n%s", got.HTML)
 	}
 }

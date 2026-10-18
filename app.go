@@ -2,14 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/yuin/goldmark"
+	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -39,71 +41,26 @@ func (a *App) shutdown(ctx context.Context) {
 	a.watcher.close()
 }
 
-// FileResult is returned to the frontend after loading and rendering a
-// markdown file.
+// FileResult is returned to the frontend after loading and rendering a file.
 type FileResult struct {
-	Path string `json:"path"`
-	Name string `json:"name"`
-	HTML string `json:"html"`
+	Path      string `json:"path"`
+	Name      string `json:"name"`
+	HTML      string `json:"html"`
+	Mode      string `json:"mode"`      // "markdown" | "source" | "text"
+	Language  string `json:"language"`  // label shown in the toolbar
+	EveryLine bool   `json:"everyLine"` // gutter numbers every source line
 }
 
 var markdown = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithExtensions(
+		extension.GFM,
+		// Labelled fences only: WithGuessLanguage stays off (ADR-002).
+		highlighting.NewHighlighting(
+			highlighting.WithFormatOptions(chromahtml.WithClasses(true)),
+		),
+	),
 	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
-
-// format is one entry in the selection table. Plain struct, no interface
-// (ADR-003 Option B).
-type format struct {
-	name   string // "markdown"
-	match  func(path string) bool
-	render func(src []byte) (string, error)
-}
-
-// formats is ordered; first match wins.
-var formats = []format{markdownFormat}
-
-var markdownFormat = format{
-	name: "markdown",
-	match: func(path string) bool {
-		lower := strings.ToLower(path)
-		return strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".markdown")
-	},
-	render: renderMarkdown,
-}
-
-// selectFormat walks formats (first match wins).
-func selectFormat(path string) (format, bool) {
-	for _, f := range formats {
-		if f.match(path) {
-			return f, true
-		}
-	}
-	return format{}, false
-}
-
-// loadSource is the only reader of user files: format selection, stat and
-// directory checks, then the read.
-func loadSource(path string) ([]byte, format, error) {
-	f, ok := selectFormat(path)
-	if !ok {
-		return nil, format{}, fmt.Errorf("%s: not a .md file", path)
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, format{}, fmt.Errorf("cannot open %s: %w", filepath.Base(path), err)
-	}
-	if info.IsDir() {
-		return nil, format{}, fmt.Errorf("%s is a directory, not a file", path)
-	}
-
-	src, err := os.ReadFile(path)
-	if err != nil {
-		return nil, format{}, err
-	}
-	return src, f, nil
-}
 
 func renderFile(path string) (FileResult, error) {
 	src, f, err := loadSource(path)
@@ -111,7 +68,7 @@ func renderFile(path string) (FileResult, error) {
 		return FileResult{}, err
 	}
 
-	out, err := f.render(src)
+	out, lang, err := f.render(path, src)
 	if err != nil {
 		return FileResult{}, err
 	}
@@ -122,9 +79,12 @@ func renderFile(path string) (FileResult, error) {
 	}
 
 	return FileResult{
-		Path: abs,
-		Name: filepath.Base(abs),
-		HTML: out,
+		Path:      abs,
+		Name:      filepath.Base(abs),
+		HTML:      out,
+		Mode:      f.name,
+		Language:  lang,
+		EveryLine: f.everyLine,
 	}, nil
 }
 
@@ -189,12 +149,25 @@ func firstOffset(n ast.Node) int {
 	return -1
 }
 
+// GetHighlightCSS returns the syntax-highlighting stylesheet. The frontend
+// injects it once at startup, before the first render.
+func (a *App) GetHighlightCSS() string {
+	return highlightCSS()
+}
+
+// openingEvent tells the frontend which file is being loaded, so it can show
+// a slow-load cue (DEC-S10).
+func (a *App) openingEvent(path string) {
+	runtime.EventsEmit(a.ctx, "file:opening", filepath.Base(path))
+}
+
 // GetInitialFile returns the rendered file passed on the command line, if
 // any. The frontend calls this once on startup.
 func (a *App) GetInitialFile() (FileResult, error) {
 	if a.initial == "" {
 		return FileResult{}, nil
 	}
+	a.openingEvent(a.initial)
 	result, err := renderFile(a.initial)
 	if err == nil {
 		a.watcher.watch(result.Path)
@@ -202,15 +175,25 @@ func (a *App) GetInitialFile() (FileResult, error) {
 	return result, err
 }
 
-// OpenFile shows a native file-open dialog filtered to markdown files, then
-// loads and renders the chosen file. Returns a zero-value FileResult (no
-// error) if the user cancels the dialog.
+// dialogFilters builds the Open-dialog filters: All files first (the
+// default), then one per format that declares a filter.
+func dialogFilters() []runtime.FileFilter {
+	filters := []runtime.FileFilter{{DisplayName: "All files (*)", Pattern: "*"}}
+	for _, f := range formats {
+		if f.filterName != "" {
+			filters = append(filters, runtime.FileFilter{DisplayName: f.filterName, Pattern: f.filterPattern})
+		}
+	}
+	return filters
+}
+
+// OpenFile shows a native file-open dialog, then loads and renders the
+// chosen file. Returns a zero-value FileResult (no error) if the user
+// cancels the dialog.
 func (a *App) OpenFile() (FileResult, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Open Markdown File",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Markdown (*.md, *.markdown)", Pattern: "*.md;*.markdown"},
-		},
+		Title:   "Open File",
+		Filters: dialogFilters(),
 	})
 	if err != nil {
 		return FileResult{}, err
@@ -218,9 +201,15 @@ func (a *App) OpenFile() (FileResult, error) {
 	if path == "" {
 		return FileResult{}, nil
 	}
+	a.openingEvent(path)
 	result, err := renderFile(path)
-	if err == nil {
-		a.watcher.watch(result.Path)
+	if err != nil {
+		var refusal *refusalError
+		if errors.As(err, &refusal) {
+			return FileResult{}, errors.New(refusal.inApp())
+		}
+		return FileResult{}, err
 	}
-	return result, err
+	a.watcher.watch(result.Path)
+	return result, nil
 }

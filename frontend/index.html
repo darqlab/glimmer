@@ -8,21 +8,35 @@
 <body>
 <div id="app">
     <header id="toolbar">
-        <button id="open-btn" class="btn" title="Open a markdown file">
+        <button id="open-btn" class="btn" title="Open a file">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="currentColor" d="M10 4H2v16h20V6H12l-2-2z"/>
             </svg>
             Open
         </button>
-        <span id="path-label" class="path-label"></span>
+        <span id="path-label" class="path-label"><bdi dir="ltr"></bdi></span>
+        <span id="mode-label" class="mode-label" hidden><span class="vh">File type: </span><span id="mode-label-text"></span></span>
         <button id="lines-btn" class="btn icon-btn icon-group-start" title="Toggle source line numbers">#️⃣</button>
         <button id="copy-btn" class="btn icon-btn" title="Copy selected text automatically">📋</button>
         <button id="theme-btn" class="btn icon-btn" title="Toggle dark / light mode"></button>
     </header>
-    <main id="content-wrap">
+    <div id="notice" role="alert" hidden>
+        <svg class="notice-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M5.6 5.6l12.8 12.8" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span id="notice-text" class="notice-text"></span>
+        <button id="notice-dismiss" class="btn notice-dismiss" type="button">
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            Dismiss
+        </button>
+    </div>
+    <main id="content-wrap" tabindex="0" aria-label="File content">
         <div id="content" class="markdown-body"></div>
         <div id="empty-state">
-            <p>Open a <code>.md</code> file to start reading.</p>
+            <p id="empty-text">Open a file to start reading.</p>
         </div>
     </main>
     <div id="toast" role="status" aria-live="polite"></div>
