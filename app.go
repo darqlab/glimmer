@@ -52,35 +52,68 @@ var markdown = goldmark.New(
 	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
 
-func renderFile(path string) (FileResult, error) {
-	if !strings.HasSuffix(strings.ToLower(path), ".md") &&
-		!strings.HasSuffix(strings.ToLower(path), ".markdown") {
-		return FileResult{}, fmt.Errorf("%s: not a .md file", path)
+// format is one entry in the selection table. Plain struct, no interface
+// (ADR-003 Option B).
+type format struct {
+	name   string // "markdown"
+	match  func(path string) bool
+	render func(src []byte) (string, error)
+}
+
+// formats is ordered; first match wins.
+var formats = []format{markdownFormat}
+
+var markdownFormat = format{
+	name: "markdown",
+	match: func(path string) bool {
+		lower := strings.ToLower(path)
+		return strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".markdown")
+	},
+	render: renderMarkdown,
+}
+
+// selectFormat walks formats (first match wins).
+func selectFormat(path string) (format, bool) {
+	for _, f := range formats {
+		if f.match(path) {
+			return f, true
+		}
+	}
+	return format{}, false
+}
+
+// loadSource is the only reader of user files: format selection, stat and
+// directory checks, then the read.
+func loadSource(path string) ([]byte, format, error) {
+	f, ok := selectFormat(path)
+	if !ok {
+		return nil, format{}, fmt.Errorf("%s: not a .md file", path)
 	}
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return FileResult{}, fmt.Errorf("cannot open %s: %w", filepath.Base(path), err)
+		return nil, format{}, fmt.Errorf("cannot open %s: %w", filepath.Base(path), err)
 	}
 	if info.IsDir() {
-		return FileResult{}, fmt.Errorf("%s is a directory, not a file", path)
+		return nil, format{}, fmt.Errorf("%s is a directory, not a file", path)
 	}
 
 	src, err := os.ReadFile(path)
 	if err != nil {
+		return nil, format{}, err
+	}
+	return src, f, nil
+}
+
+func renderFile(path string) (FileResult, error) {
+	src, f, err := loadSource(path)
+	if err != nil {
 		return FileResult{}, err
 	}
 
-	var buf strings.Builder
-	doc := markdown.Parser().Parse(text.NewReader(src))
-	lineStarts := buildLineIndex(src)
-	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
-		ln := lineOf(lineStarts, firstOffset(n))
-		fmt.Fprintf(&buf, `<div class="md-block" data-line="%d">`, ln)
-		if err := markdown.Renderer().Render(&buf, src, n); err != nil {
-			return FileResult{}, err
-		}
-		buf.WriteString("</div>")
+	out, err := f.render(src)
+	if err != nil {
+		return FileResult{}, err
 	}
 
 	abs, err := filepath.Abs(path)
@@ -91,8 +124,25 @@ func renderFile(path string) (FileResult, error) {
 	return FileResult{
 		Path: abs,
 		Name: filepath.Base(abs),
-		HTML: buf.String(),
+		HTML: out,
 	}, nil
+}
+
+// renderMarkdown renders src as GFM, wrapping each top-level block in an
+// md-block div that carries its 1-based source line.
+func renderMarkdown(src []byte) (string, error) {
+	var buf strings.Builder
+	doc := markdown.Parser().Parse(text.NewReader(src))
+	lineStarts := buildLineIndex(src)
+	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
+		ln := lineOf(lineStarts, firstOffset(n))
+		fmt.Fprintf(&buf, `<div class="md-block" data-line="%d">`, ln)
+		if err := markdown.Renderer().Render(&buf, src, n); err != nil {
+			return "", err
+		}
+		buf.WriteString("</div>")
+	}
+	return buf.String(), nil
 }
 
 // buildLineIndex returns the byte offset of the start of each line in src.
