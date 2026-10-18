@@ -101,7 +101,7 @@ Every push/PR also runs `.github/workflows/ci.yml` (Linux build + `go vet`).
   a `bindings` build tag so Wails' internal bindings-generation step, which
   runs the binary with no arguments, isn't intercepted by the help/exit path)
 - `app.go` — Go backend: renders markdown to HTML (goldmark + GFM extensions),
-  exposes `OpenFile` / `GetInitialFile` / `LoadFile` to the frontend
+  exposes `OpenFile` / `GetInitialFile` to the frontend
 - `watcher.go` — filesystem watch on the open file's parent directory
   (fsnotify + debounce); pushes a `file:changed` event to the frontend on
   external edits

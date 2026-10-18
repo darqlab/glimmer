@@ -174,12 +174,3 @@ func (a *App) OpenFile() (FileResult, error) {
 	}
 	return result, err
 }
-
-// LoadFile reads and renders a specific path, for future drag-and-drop use.
-func (a *App) LoadFile(path string) (FileResult, error) {
-	result, err := renderFile(path)
-	if err == nil {
-		a.watcher.watch(result.Path)
-	}
-	return result, err
-}
