@@ -96,8 +96,9 @@ BEHAVIOR
   - Structured files (JSON, YAML, XML, TOML, INI) are shown exactly as they
     are on disk: never reformatted, so line numbers match the file. A
     malformed file still displays; the bad tokens are marked.
-  - Files are limited to 5 MB. Binary files (a NUL byte or invalid UTF-8 in
-    the first 8 KB) are refused. Markdown files skip the binary check.
+  - Markdown files are limited to 5 MB; source and text files to 256 KB.
+    Binary files (a NUL byte or invalid UTF-8 in the first 8 KB) are
+    refused. Markdown files skip the binary check.
   - Theme follows the OS light/dark preference by default; use the toolbar's
     sun/moon button to override, which is remembered between runs.
   - Source line numbers: the toolbar's #️⃣ button toggles a left-hand gutter.
@@ -118,7 +119,8 @@ BEHAVIOR
 
 ERRORS
   - Binary file                 -> "<path>: binary file, not shown. glimmer shows text files only."
-  - File over 5 MB              -> "<path>: file too large (<size> MB; limit is 5 MB)"
+  - Markdown over 5 MB, or
+    source/text over 256 KB     -> "<path>: file too large (<size> <MB|KB>; limit is <5 MB|256 KB>)"
   - Missing/unreadable file     -> "cannot open <name>: <os error>"
   - Directory path              -> "<path> is a directory, not a file"
   A binary or oversized file given on the command line exits with status 1

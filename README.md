@@ -64,7 +64,7 @@ Structured files (JSON, YAML, XML, TOML, INI) are shown exactly as they are on
 disk and are never reformatted, so line numbers match the file. A malformed
 file still displays, with the bad tokens marked.
 
-Files over 5 MB are refused, and so are binary files (a NUL byte or invalid
+Markdown files over 5 MB and source or text files over 256 KB are refused, and so are binary files (a NUL byte or invalid
 UTF-8 in the first 8 KB; markdown files skip the binary check). On the command
 line this exits with status 1 and a message on stderr before any window opens.
 From the **Open** button, the message appears in a notice bar and the current
@@ -126,7 +126,7 @@ Every push/PR also runs `.github/workflows/ci.yml` (Linux build + `go vet`).
   runs the binary with no arguments, isn't intercepted by the help/exit path)
 - `app.go` — Go backend: renders markdown to HTML (goldmark + GFM extensions),
   exposes `OpenFile` / `GetInitialFile` / `GetHighlightCSS` to the frontend
-- `filetype.go` — file loading and limits (5 MB cap, binary check), the ordered
+- `filetype.go` — file loading and limits (5 MB markdown / 256 KB source and text caps, binary check), the ordered
   `formats` table that picks markdown, source or text for a file, and the CLI
   pre-flight check
 - `highlight.go` — chroma rendering of source and text files, and the

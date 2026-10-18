@@ -35,7 +35,7 @@ func captureStdout(t *testing.T, fn func()) string {
 // AT-S15: help text no longer claims markdown only and documents refusals.
 func TestHelpTextAT_S15(t *testing.T) {
 	llm := captureStdout(t, printLLMHelp)
-	for _, want := range []string{"binary", "too large", "5 MB"} {
+	for _, want := range []string{"binary", "too large", "5 MB", "256 KB"} {
 		if !strings.Contains(llm, want) {
 			t.Errorf("llm help missing %q", want)
 		}

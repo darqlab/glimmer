@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	maxFileSize = 5 << 20 // 5 MiB = 5,242,880 bytes
-	sniffLen    = 8 << 10 // first 8 KiB inspected for binary content
+	maxMarkdownSize = 5 << 20   // 5 MiB = 5,242,880 bytes, markdown files
+	maxSourceSize   = 256 << 10 // 256 KiB = 262,144 bytes, source and text files
+	sniffLen        = 8 << 10   // first 8 KiB inspected for binary content
 )
 
 // format is one entry in the selection table. Plain struct, no interface
@@ -23,10 +24,19 @@ type format struct {
 	name          string // FileResult.Mode: "markdown" | "source" | "text"
 	everyLine     bool   // gutter: false = block starts (markdown), true = every source line
 	skipSniff     bool   // true only for markdown (DEC-S7)
+	maxBytes      int64  // size cap for this format; 0 = maxSourceSize
 	filterName    string // Open-dialog filter label; "" = no per-format filter
 	filterPattern string // e.g. "*.md;*.markdown"
 	match         func(path string, head []byte) bool
 	render        func(path string, src []byte) (html, language string, err error)
+}
+
+// limit returns the size cap for the format.
+func (f format) limit() int64 {
+	if f.maxBytes > 0 {
+		return f.maxBytes
+	}
+	return maxSourceSize
 }
 
 // formats is ordered; first match wins. The plain-text fallback (textFormat)
@@ -37,6 +47,7 @@ var formats = []format{markdownFormat, textByNameFormat, sourceFormat}
 var markdownFormat = format{
 	name:          "markdown",
 	skipSniff:     true,
+	maxBytes:      maxMarkdownSize,
 	filterName:    "Markdown (*.md, *.markdown)",
 	filterPattern: "*.md;*.markdown",
 	match: func(path string, _ []byte) bool {
@@ -155,13 +166,22 @@ type refusalError struct {
 	path   string
 	binary bool
 	size   int64
+	limit  int64
+}
+
+// tooLargeMessage is the single source of the over-size message.
+func tooLargeMessage(size, limit int64) string {
+	if limit < 1<<20 {
+		return fmt.Sprintf("file too large (%.1f KB; limit is %d KB)", float64(size)/(1<<10), limit>>10)
+	}
+	return fmt.Sprintf("file too large (%.1f MB; limit is %d MB)", float64(size)/(1<<20), limit>>20)
 }
 
 func (e *refusalError) reason() string {
 	if e.binary {
 		return "binary file"
 	}
-	return fmt.Sprintf("file too large (%.1f MB; limit is 5 MB)", float64(e.size)/(1<<20))
+	return tooLargeMessage(e.size, e.limit)
 }
 
 func (e *refusalError) Error() string {
@@ -190,26 +210,30 @@ func loadSource(path string) ([]byte, format, error) {
 	if info.IsDir() {
 		return nil, format{}, fmt.Errorf("%s is a directory, not a file", path)
 	}
-	if info.Size() > maxFileSize {
-		return nil, format{}, &refusalError{path: path, size: info.Size()}
-	}
 
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil, format{}, fmt.Errorf("cannot open %s: %w", filepath.Base(path), err)
 	}
 	defer fh.Close()
-	src, err := io.ReadAll(io.LimitReader(fh, maxFileSize+1))
+	head, err := io.ReadAll(io.LimitReader(fh, sniffLen))
 	if err != nil {
 		return nil, format{}, err
 	}
-	if len(src) > maxFileSize {
-		return nil, format{}, &refusalError{path: path, size: int64(len(src))}
-	}
-
-	head := src[:min(len(src), sniffLen)]
 	f := selectFormat(path, head)
-	if !f.skipSniff && isBinary(head) {
+	limit := f.limit()
+	if info.Size() > limit {
+		return nil, format{}, &refusalError{path: path, size: info.Size(), limit: limit}
+	}
+	rest, err := io.ReadAll(io.LimitReader(fh, limit+1-int64(len(head))))
+	if err != nil {
+		return nil, format{}, err
+	}
+	src := append(head, rest...)
+	if int64(len(src)) > limit {
+		return nil, format{}, &refusalError{path: path, size: int64(len(src)), limit: limit}
+	}
+	if !f.skipSniff && isBinary(src[:min(len(src), sniffLen)]) {
 		return nil, format{}, &refusalError{path: path, binary: true}
 	}
 	return src, f, nil
@@ -246,9 +270,6 @@ func preflight(path string) error {
 	if err != nil || info.IsDir() {
 		return nil
 	}
-	if info.Size() > maxFileSize {
-		return &refusalError{path: path, size: info.Size()}
-	}
 	fh, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -258,7 +279,11 @@ func preflight(path string) error {
 	if err != nil {
 		return nil
 	}
-	if f := selectFormat(path, head); !f.skipSniff && isBinary(head) {
+	f := selectFormat(path, head)
+	if limit := f.limit(); info.Size() > limit {
+		return &refusalError{path: path, size: info.Size(), limit: limit}
+	}
+	if !f.skipSniff && isBinary(head) {
 		return &refusalError{path: path, binary: true}
 	}
 	return nil

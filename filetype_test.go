@@ -179,24 +179,24 @@ func TestBinarySniffAT_S11(t *testing.T) {
 
 // AT-S12: size-cap boundaries.
 func TestSizeCapAT_S12(t *testing.T) {
-	t.Run("exactly at cap is accepted", func(t *testing.T) {
-		path := writeFixture(t, "cap.txt", bytes.Repeat([]byte("a\n"), maxFileSize/2))
+	t.Run("exactly at markdown cap is accepted", func(t *testing.T) {
+		path := writeFixture(t, "cap.md", bytes.Repeat([]byte("a\n"), maxMarkdownSize/2))
 		src, _, err := loadSource(path)
 		if err != nil {
 			t.Fatalf("loadSource: %v", err)
 		}
-		if len(src) != maxFileSize {
-			t.Errorf("len(src) = %d, want %d", len(src), maxFileSize)
+		if len(src) != maxMarkdownSize {
+			t.Errorf("len(src) = %d, want %d", len(src), maxMarkdownSize)
 		}
 		if err := preflight(path); err != nil {
 			t.Errorf("preflight: %v", err)
 		}
 	})
-	over := []string{"over.txt", "over.md"}
+	over := []string{"over.md"}
 	for _, name := range over {
 		t.Run("cap+1 "+name, func(t *testing.T) {
 			path := writeFixture(t, name, nil)
-			if err := os.Truncate(path, maxFileSize+1); err != nil {
+			if err := os.Truncate(path, maxMarkdownSize+1); err != nil {
 				t.Fatal(err)
 			}
 			_, _, err := loadSource(path)
@@ -212,8 +212,40 @@ func TestSizeCapAT_S12(t *testing.T) {
 			}
 		})
 	}
+	t.Run("source and text 256 KiB cap", func(t *testing.T) {
+		for _, name := range []string{"cap.txt", "cap.go", "cap.json"} {
+			content := bytes.Repeat([]byte("a\n"), maxSourceSize/2)
+			path := writeFixture(t, name, content)
+			src, _, err := loadSource(path)
+			if err != nil || len(src) != maxSourceSize {
+				t.Errorf("%s at cap: len=%d err=%v", name, len(src), err)
+			}
+			if err := preflight(path); err != nil {
+				t.Errorf("%s preflight at cap: %v", name, err)
+			}
+			over := writeFixture(t, "over-"+name, append(content, 'a'))
+			want := "file too large (256.0 KB; limit is 256 KB)"
+			_, _, err = loadSource(over)
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("%s loadSource err = %v, want %q", name, err, want)
+			}
+			if err := preflight(over); err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("%s preflight err = %v, want %q", name, err, want)
+			}
+		}
+	})
+	t.Run("300 KB source message", func(t *testing.T) {
+		path := writeFixture(t, "big.txt", nil)
+		if err := os.Truncate(path, 300<<10); err != nil {
+			t.Fatal(err)
+		}
+		err := preflight(path)
+		if err == nil || !strings.Contains(err.Error(), "file too large (300.0 KB; limit is 256 KB)") {
+			t.Errorf("err = %v", err)
+		}
+	})
 	t.Run("6 MB message", func(t *testing.T) {
-		path := writeFixture(t, "six.txt", nil)
+		path := writeFixture(t, "six.md", nil)
 		if err := os.Truncate(path, 6<<20); err != nil {
 			t.Fatal(err)
 		}
@@ -223,7 +255,7 @@ func TestSizeCapAT_S12(t *testing.T) {
 		}
 		var ref *refusalError
 		if errors.As(err, &ref) {
-			want := "Can't show six.txt: file too large (6.0 MB; limit is 5 MB)."
+			want := "Can't show six.md: file too large (6.0 MB; limit is 5 MB)."
 			if ref.inApp() != want {
 				t.Errorf("inApp = %q, want %q", ref.inApp(), want)
 			}
