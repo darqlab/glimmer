@@ -29,6 +29,8 @@ func verbatim(t *testing.T, rendered string) string {
 func checkVerbatim(t *testing.T, name, src, rendered string) {
 	t.Helper()
 	got := verbatim(t, rendered)
+	// The carriage return is a line-ending marker and is not displayed.
+	got, src = strings.ReplaceAll(got, "\r", ""), strings.ReplaceAll(src, "\r", "")
 	if got != src && got != src+"\n" {
 		t.Errorf("%s: displayed text differs from source\n got: %q\nwant: %q", name, got, src)
 	}

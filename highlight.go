@@ -46,8 +46,14 @@ func formatTokens(src []byte, lexer chroma.Lexer) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// The carriage return is a line-ending marker, not content: drop it so the
+	// browser does not render it as an extra break. '\n' tokens are untouched.
+	toks := it.Tokens()
+	for i := range toks {
+		toks[i].Value = strings.ReplaceAll(toks[i].Value, "\r", "")
+	}
 	var buf bytes.Buffer
-	if err := sourceFormatter.Format(&buf, styles.Get("github"), it); err != nil {
+	if err := sourceFormatter.Format(&buf, styles.Get("github"), chroma.Literator(toks...)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
@@ -66,7 +72,7 @@ func escapedLines(src []byte) string {
 		} else {
 			rest = ""
 		}
-		b.WriteString(`<span class="line"><span class="cl">` + stdhtml.EscapeString(line) + `</span></span>`)
+		b.WriteString(`<span class="line"><span class="cl">` + stdhtml.EscapeString(strings.ReplaceAll(line, "\r", "")) + `</span></span>`)
 	}
 	b.WriteString(`</code></pre>`)
 	return b.String()
