@@ -108,6 +108,7 @@ func highlightCSS() string {
 			chroma.GenericPrompt:  "#9198a1",
 			chroma.Error:          "#ff8a80",
 		}, nil)
+		dark += darkFallbackRules(light, dark)
 
 		var b strings.Builder
 		b.WriteString(light)
@@ -118,6 +119,32 @@ func highlightCSS() string {
 		highlightBlob = b.String()
 	})
 	return highlightBlob
+}
+
+// darkBase is the dark theme's default text colour.
+const darkBase = "#e6edf3"
+
+// tokenRuleClass matches the class selector of a chroma token rule line.
+var tokenRuleClass = regexp.MustCompile(`^(?:/\* [^*]*\*/ )?\.chroma (\.[A-Za-z0-9]+) \{`)
+
+// darkFallbackRules returns an explicit base-colour rule for every token class
+// that the light stylesheet styles but the dark one does not, so a light rule
+// can never leak into dark mode.
+func darkFallbackRules(light, dark string) string {
+	have := map[string]bool{}
+	for _, line := range strings.Split(dark, "\n") {
+		if m := tokenRuleClass.FindStringSubmatch(line); m != nil {
+			have[m[1]] = true
+		}
+	}
+	var out strings.Builder
+	for _, line := range strings.Split(light, "\n") {
+		if m := tokenRuleClass.FindStringSubmatch(line); m != nil && !have[m[1]] {
+			have[m[1]] = true
+			out.WriteString(".chroma " + m[1] + " { color: " + darkBase + " }\n")
+		}
+	}
+	return out.String()
 }
 
 // backgroundDecl matches a CSS background-color declaration. chroma's own
